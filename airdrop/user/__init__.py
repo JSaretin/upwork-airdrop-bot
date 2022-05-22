@@ -1,17 +1,17 @@
-import asyncio
-import random
-from typing import Dict, List, Tuple
-from bot import bot
-from telebot.async_telebot import types
+from airdrop import (AirdropConfig, FormatedData, MessageIds, Tuple, User,
+                     asyncio, bot, delete_message, format_data,
+                     get_current_user, get_validation_ids, random, Dict, token_urlsafe,
+                     save_validation_id, send_message, types, update_db_object, update_referral)
 
-from bot.background_task import *
-from bot.hooks import *
-from bot.structure import *
-from bot.utils import *
+DASHBOARD_BUTTONS = [
+        'check wallet',
+        'check email',
+        'get referral link',
+        'get start',
+        'check twitter',
+        'withdraw',
+    ]
 
-
-
-# @Decorators.register_handler(lambda message: message.text == '🔍')
 
 def permission(allowed_perm: Tuple = ('captcha', 'accept_terms', 'address', 'email', 'twitter')):
     def decorator(func):
@@ -24,6 +24,7 @@ def permission(allowed_perm: Tuple = ('captcha', 'accept_terms', 'address', 'ema
                 'address':  user.address,
                 'email':  user.email,
                 'twitter':  user.twitter_username,
+                'retweet': user.retweeted,
                 'admin':  user.is_admin,
                 'complete':  user.registration_complete,
             }
@@ -32,17 +33,17 @@ def permission(allowed_perm: Tuple = ('captcha', 'accept_terms', 'address', 'ema
             if len(failed_perms) > 0:
                 asyncio.create_task(delete_message(message.chat_id, message.id))
                 return await start(message, **kwargs)
+                pass
     
             result = await func(*args, **kwargs)
             return result
         return wrapper
     return decorator
 
-# @Decorators.register_handler(lambda message: message.text == '🔍')
 
 
 
-@get_current_user
+@get_current_user()
 async def send_captcha_message(message: FormatedData, **kwargs):
     user: User = kwargs['user']
     
@@ -84,17 +85,12 @@ async def request_to_join_channel(message: FormatedData):
     
 
 
-@get_current_user
+@get_current_user()
 @get_validation_ids
 async def request_wallet_address(message: FormatedData, **kwargs):
     '''
     This function requests the user wallet address
-    '''
-    user : User = kwargs['user']
-    if user.address:
-        asyncio.create_task(send_message(message, 'Your wallet address is: ' + user.address))
-        return
-    
+    '''    
     message_ids: MessageIds = kwargs['message_ids']
     message_ids_db = kwargs['message_ids_db']
 
@@ -108,18 +104,12 @@ async def request_wallet_address(message: FormatedData, **kwargs):
     
 
 
-@get_current_user
+@get_current_user()
 @get_validation_ids
 async def request_email(message: FormatedData, **kwargs):
     '''
     This function send the user a request to submit his/her email
     '''
-    user: User = kwargs['user']
-    if user.email:
-        asyncio.create_task(send_message(message.chat_id, 'Your email is: ' + user.email))
-        return
-
-
     message_ids: MessageIds = kwargs['message_ids']
     message_ids_db = kwargs['message_ids_db']
 
@@ -132,7 +122,7 @@ async def request_email(message: FormatedData, **kwargs):
 
 
 
-@get_current_user
+@get_current_user()
 @get_validation_ids
 async def request_twitter_user_link(message: FormatedData, **kwargs):
     '''
@@ -146,56 +136,45 @@ async def request_twitter_user_link(message: FormatedData, **kwargs):
                                                                 message_ids.twitter_username_request_msg_id))
     sent_msg = await send_message(message, 'Please send your twitter profile link', reply_markup=types.ForceReply())
     message_ids.twitter_username_request_msg_id = sent_msg.message_id
-    asyncio.create_task(update_db_object(message_ids, kwargs['message_db']))
+    asyncio.create_task(update_db_object(message_ids, kwargs['message_ids_db']))
 
 
-@get_current_user
+@get_current_user()
 @get_validation_ids
 async def request_post_retweet(message: FormatedData, **kwargs):
     '''
     Request user to retweet the post
     '''
-    # user: User = kwargs['user']
     message_ids: MessageIds = kwargs['message_ids']
     airdrop_config: AirdropConfig = kwargs['airdrop_config']
-
-    if message_ids.post_retweet_msg_id: asyncio.create_task(delete_message(message.chat_id, 
-                                                                message_ids.post_retweet_msg_id))
-
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton('Retweet Post', url=airdrop_config.twitter_post_retweet_link))
     markup.add(types.InlineKeyboardButton('Confirm', callback_data='retweeted_post'))
     
-    sent_msg = await send_message(message, airdrop_config.request_twitter_post_retweet_message, reply_markup=types.ForceReply())
-    message_ids.twitter_post_retweet_link_i = sent_msg.message_id
-    asyncio.create_task(update_db_object(message_ids, kwargs['message_db']))
+    sent_msg = await send_message(message, 
+                       airdrop_config.request_twitter_post_retweet_message.replace('{}', 
+                                                        airdrop_config.twitter_post_retweet_link), 
+                                                reply_markup=markup)
+    if message_ids.retweet_request_id: asyncio.create_task(delete_message(message.chat_id, message_ids.retweet_request_id))
+    message_ids.retweet_request_id = sent_msg.message_id
+    asyncio.create_task(update_db_object(message_ids, kwargs['message_ids_db']))
 
-
-@get_current_user
-@permission(allowed_perm=('captcha', 'accept_terms', 'address', 'email'))
-# @permission(allowed_perm=('captcha', 'accept_terms', 'address', 'email', 'twitter', 'complete'))
+@get_current_user()
+@permission(allowed_perm=('captcha', 'accept_terms', 'address', 'email', 'twitter', 'retweet', 'complete'))
 async def dashboard(message: FormatedData, **kwargs):
     '''
     This function shows the user dashboard
     '''
-    # user: User = kwargs['user']
-    # if not user.registration_complete:
-    #     # run the start function again
-    #     await start(message)
-    #     return
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-
-    buttons = [
-        'Wallet Address',
-        'Email',
-        'Referral Link',
-        'My Referrals',
-        'Balance',
-        'Rules',
-        'Withdraw',
+    buttons_list = [
+            'check wallet',
+            'check email',
+            'get referral link',
+            'get start',
+            'check twitter',
+            'withdraw',
     ]
-
-    buttons = [types.KeyboardButton(button) for button in buttons]
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    buttons = [types.KeyboardButton(button) for button in buttons_list]
     markup.add(*buttons)
 
     await send_message(message, 'Your dashboard', reply_markup=markup)
@@ -205,11 +184,16 @@ async def dashboard(message: FormatedData, **kwargs):
 
 
 
-@get_current_user
-async def start(message, **kwargs):
+@get_current_user()
+async def start(message: FormatedData, **kwargs):
     user: User = kwargs['user']
         
-    if not user.key or user.is_bot:
+    if user.is_bot:
+        split_msg_text = message.msg_text.split(' ')
+        if not user.referral_code and len(split_msg_text) == 2:
+            user.referral_code = split_msg_text[1]
+            asyncio.create_task(update_db_object(user, kwargs['user_db']))
+            
         return await send_captcha_message(message, **kwargs)
     
     if not user.accepted_terms:
@@ -227,8 +211,11 @@ async def start(message, **kwargs):
     if not user.email:
         return await request_email(message, **kwargs)
     
+    if not user.twitter_username:
+        return await request_twitter_user_link(message, **kwargs)
+    
     if not user.retweeted:
-        pass
+        return await request_post_retweet(message, **kwargs)
     
     await dashboard(message, **kwargs)
 
@@ -237,7 +224,7 @@ async def start(message, **kwargs):
 
 # USER INPUT DATA HANDLERS BEGINS HERE
 
-@get_current_user
+@get_current_user()
 @get_validation_ids
 async def confirm_verification_handler(message: FormatedData, **kwargs: Dict):
     user: User = kwargs['user']
@@ -273,7 +260,7 @@ async def confirm_verification_handler(message: FormatedData, **kwargs: Dict):
     
     
 
-@get_current_user
+@get_current_user()
 async def accept_terms_callback_handler(message: FormatedData, **kwargs):
     user: User = kwargs['user']
     if user.accepted_terms:
@@ -296,7 +283,7 @@ async def accept_terms_callback_handler(message: FormatedData, **kwargs):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'joined_group')
-@get_current_user
+@get_current_user()
 async def check_user_in_group_handler(message: FormatedData, **kwargs):
     user : User = kwargs['user']
     if user.group_status == 0:
@@ -308,7 +295,7 @@ async def check_user_in_group_handler(message: FormatedData, **kwargs):
     
     
 
-@get_current_user
+@get_current_user()
 async def check_user_in_channel_handler(message: FormatedData, **kwargs):
     user : User = kwargs['user']
     if  user.channel_status == 0:
@@ -319,7 +306,7 @@ async def check_user_in_channel_handler(message: FormatedData, **kwargs):
     
 
 
-@get_current_user
+@get_current_user()
 @permission(allowed_perm=('captcha', 'accept_terms'))
 @get_validation_ids
 async def register_address_handler(message: FormatedData, **kwargs):
@@ -356,7 +343,7 @@ async def register_address_handler(message: FormatedData, **kwargs):
 
 
 
-@get_current_user
+@get_current_user()
 @permission(allowed_perm=('captcha', 'accept_terms', 'address'))
 @get_validation_ids
 async def register_email_handler(message: FormatedData, **kwargs):
@@ -393,7 +380,7 @@ async def register_email_handler(message: FormatedData, **kwargs):
 
 
 
-@get_current_user
+@get_current_user()
 @permission(allowed_perm=('captcha', 'accept_terms', 'address', 'email'))
 @get_validation_ids
 async def twitter_link_submition_handler(message: FormatedData, **kwargs):
@@ -402,7 +389,7 @@ async def twitter_link_submition_handler(message: FormatedData, **kwargs):
         asyncio.create_task(handle_invalid_message(message))
         return
     messages_ids : MessageIds = kwargs['message_ids']
-    if not message.reply_to_msg_id or message.reply_to_msg_id != messages_ids.twitter_request_msg_id:
+    if not message.reply_to_msg_id or message.reply_to_msg_id != messages_ids.twitter_username_request_msg_id:
         asyncio.create_task(send_message(message, 'please, reply to the twitter request message or click /start to get the question again'))
         return
     
@@ -421,9 +408,88 @@ async def twitter_link_submition_handler(message: FormatedData, **kwargs):
     await start(message, **kwargs)
     
 
+@get_current_user()
+@permission(allowed_perm=('captcha', 'accept_terms', 'address', 'email', 'twitter'))
+async def retweeted_callback_handler(message: FormatedData, **kwargs):
+    user: User = kwargs['user']
+    if user.retweeted: 
+        asyncio.create_task(delete_message(message.chat_id, [message.reply_to_msg_id]))
+        asyncio.create_task(handle_invalid_message(message))
+        return
+    user_db = kwargs['user_db']
+    
+    user_obj= user.dict()
+    user_obj.update({'retweeted': True, 'registration_complete': True, 'referral_link': token_urlsafe(random.randint(6, 16))})
+    user = User(**user_obj)
+    
+    asyncio.create_task(update_db_object(user, user_db))
+    asyncio.create_task(delete_message(message.chat_id, message.reply_to_msg_id))
+    if user.referral_code:
+        asyncio.create_task(update_referral(user.referral_code, user_db))
+    
+    await send_message(message, 'Congratulations!🎊\naccount created successfully')
+    await start(message, **kwargs)
+    
+
+
+@get_current_user()
+@permission(allowed_perm=('complete',))
+async def get_balance(message: FormatedData, **kwargs):
+    user: User = kwargs['user']
+    asyncio.create_task(send_message(message.chat_id, f'*main balance:* {user.balance}\n*referal balance:* {user.referral_balance}\n*total balance*: {user.referral_balance + user.balance}\n*total referrals*: {user.referrals}', parse_mode='Markdown'))
+    
+    
+
+@get_current_user()
+@permission(allowed_perm=('complete',))
+async def get_referral_link(message: FormatedData, **kwargs):
+    user: User = kwargs['user']
+    airdrop_config: AirdropConfig = kwargs['airdrop_config']
+    me = await bot.get_me()
+    asyncio.create_task(send_message(message.chat_id, airdrop_config.referral_link_message.replace('{}', f'https://t.me/{me.username}/?start={user.referral_link}'), parse_mode='Markdown'))
+    
+
+
+@get_current_user()
+@permission(allowed_perm=('complete',))
+async def check_wallet(message: FormatedData, **kwargs):
+    user: User = kwargs['user']
+    asyncio.create_task(send_message(message.chat_id, f'*wallet*: {user.address}', parse_mode='Markdown'))
+
+
+
+@get_current_user()
+@permission(allowed_perm=('complete',))
+async def check_email(message: FormatedData, **kwargs):
+    user: User = kwargs['user']
+    asyncio.create_task(send_message(message.chat_id, f'*email*: {user.email}', parse_mode='Markdown'))
+
+
+
+@get_current_user()
+@permission(allowed_perm=('complete',))
+async def check_twitter(message: FormatedData, **kwargs):
+    user: User = kwargs['user']
+    # airdriop_config: AirdropConfig = kwargs['airdrop_config']
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton('View Twitter Profile', url=f'https://twitter.com/{user.twitter_username}'))
+    asyncio.create_task(send_message(message.chat_id, f'*twitter*: @{user.twitter_username}', reply_markup=markup, parse_mode='Markdown'))
+
+
+@get_current_user()
+@permission(allowed_perm=('complete',))
+async def withdraw(message: FormatedData, **kwargs):
+    airdriop_config: AirdropConfig = kwargs['airdrop_config']
+    
+    asyncio.create_task(send_message(message.chat_id, 
+                                     airdriop_config.withdraw_message.replace('{}', airdriop_config.withdraw_date),
+                                     parse_mode='Markdown'))
+
+
 
 @format_data
 async def handle_invalid_message(message: FormatedData):
     tasks = [delete_message(message.chat_id, [message.id]),
     send_message(message, 'Invalid message')]
     await asyncio.gather(*tasks)
+
