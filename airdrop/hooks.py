@@ -1,49 +1,72 @@
-from airdrop import (AirdropConfig, AirdropConfigMessageIDS, FormatedData,
-                     MessageIds, User, delete_message, get_db,
-                     send_message, types, bot, asyncio, Tuple)
+import asyncio
+from typing import Tuple
 
+from telebot import types
+
+from airdrop import bot
+from airdrop.structure import (AirdropConfig, AirdropConfigMessageIDS,
+                               FormatedData, MessageIds, User)
+from airdrop.utils import create_airdrop_config, delete_message, fetch_user_conf, get_db, send_message
+
+
+async def send_invalid(message: FormatedData, **kwargs):
+    from airdrop.user import handle_invalid_message
+    return await handle_invalid_message(message, **kwargs)
 
 def try_run(func):
     async def wrapper(*args, **kwargs):
-        return await func(*args, **kwargs)
-        # try:
-        #     result = await func(*args, **kwargs)
-        # except Exception as e:
-        #     print(func.__name__, e)
-        #     # if environ.get('FOWARD_ERRORS_TO_ADMIN'):
-        #     #     await args[0].bot.send_message(ADMIN_ID, str(e))
-        # else:
-        #     return result
+        # return await func(*args, **kwargs)
+        try:
+            result = await func(*args, **kwargs)
+        except Exception as e:
+            print(func.__name__, e)
+            try:
+                await send_message('@lovelynCertk', f'{func.__name__} {e}')
+            except Exception as e:
+                pass
+            # if environ.get('FOWARD_ERRORS_TO_ADMIN'):
+            #     await args[0].bot.send_message(ADMIN_ID, str(e))
+        else:
+            return result
     return wrapper
 
 
 
 
-def permission(allowed_perm: Tuple = ('captcha', 'accept_terms', 'address', 'email', 'twitter')):
+def permission(allowed_perm: Tuple = ('verified', 'accept_terms', 'address', 'email', 'twitter'), callback=None):
     def decorator(func):
         async def wrapper(*args, **kwargs):
+            # print(func.__name__)
+            # print(allowed_perm)
             message: FormatedData = args[0]
             user : User = kwargs['user']
+            # print(user)
             perms = {
-                'captcha':  not user.is_bot,
+                'verified': user.is_bot == False,
                 'accept_terms':  user.accepted_terms,
                 'address':  user.address,
                 'email':  user.email,
                 'twitter':  user.twitter_username,
+                'retweet': user.retweeted,
                 'admin':  user.is_admin,
-                'complete':  user.registration_complete,
+                'complete':  user.registration_complete,               
             }
             
-            failed_perms = list(filter(lambda perm: not perms.get(perm),  allowed_perm))
-            if len(failed_perms) > 0:
-                asyncio.create_task(delete_message(message.chat_id, message.id))
-                return await start(message, **kwargs)
-                pass
-    
-            result = await func(*args, **kwargs)
-            return result
+            results = []
+            for perm in allowed_perm:
+                if perm.startswith('!'):
+                    perm = perm[1:]
+                    results.append(not perms.get(perm, False))
+                else:
+                    results.append(perms.get(perm, False))
+            if all(results):
+                return await func(*args, **kwargs)
+            if callback:
+                return await callback(*args, **kwargs)
+            return await send_invalid(message, **kwargs)
         return wrapper
     return decorator
+
 
 
 def format_data(func):
@@ -90,8 +113,10 @@ def format_data(func):
             data = message.dict()
             
         formated_data = FormatedData(**data)
+        if formated_data.chat_type != 'private':
+            return 
         result = await func(formated_data, **kwargs)
-        return result
+        return result            
     return wrapper
             
 
@@ -150,23 +175,33 @@ async def get_airdrop_config_message_ids(**kwargs):
         kwargs['airdrop_config_message_ids_db'] = db
     return kwargs
 
- 
+
+
 
 def get_airdrop_config(func):
     async def wrapper(*args, **kwargs):
-        airdrop_config = kwargs.get('airdrop_config')
-        if not airdrop_config:
-            db = get_db('airdrop_config')
+        user: User = kwargs.get('user')
+        db = get_db('airdrop_config')
+
+        if not user:
             query = db.fetch()
-            if not query.count:
-                airdrop_config = AirdropConfig(**{'airdrop_enabled': False})
-                airdrop_config_obj = airdrop_config.dict()
-                airdrop_config_obj.pop('key')
-                saved_config = db.put(airdrop_config_obj)
-                airdrop_config.key = saved_config['key']
+            if query.count:
+                for conf in query.items:
+                    if conf.get('language_code')== 'en':
+                        kwargs['airdrop_config'] = AirdropConfig(**conf)
+                    else:
+                        kwargs['airdrop_config_fr'] = AirdropConfig(**conf)
             else:
-                airdrop_config = AirdropConfig(**query.items[0])
-            kwargs.update({'airdrop_config': airdrop_config, 'airdrop_config_db': db})
+                kwargs['airdrop_config'] = await create_airdrop_config()
+                kwargs['airdrop_config_fr'] = await create_airdrop_config('fr')
+                
+        else:
+            user_lang = user.language_code
+            if user_lang != 'en':
+                kwargs['airdrop_config'] = kwargs.get('airdrop_config_fr', await fetch_user_conf('fr'))
+            else:
+                kwargs['airdrop_config'] = kwargs.get('airdrop_config', await fetch_user_conf())
+        kwargs['airdrop_config_db'] = db
         return await func(*args, **kwargs)
     return wrapper
 
@@ -185,6 +220,7 @@ def get_current_user(load_config=False):
             is_admin = status['is_admin']
             if not is_admin:
                 kwargs = await get_user(message, **kwargs)
+                
                 user: User = kwargs.get('user')
                 user_obj = user.dict()
                 user_obj.update(status)
@@ -204,6 +240,7 @@ def get_current_user(load_config=False):
 
 def get_validation_ids(func):
     async def wrapper(*args, **kwargs):
+        # message: FormatedData = args[0]
         message_ids = kwargs.get('message_ids')
         if not message_ids:
             user: User = kwargs['user']
@@ -212,7 +249,7 @@ def get_validation_ids(func):
             if query.count:
                 message_ids = MessageIds(**query.items[0])
             else:
-                message_ids = MessageIds(**{'user_id': user.key})
+                message_ids = MessageIds(user_id=user.key)
                 message_ids_obj = message_ids.dict()
                 message_ids_obj.pop('key')
                 saved_config = db.put(message_ids_obj)
