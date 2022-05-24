@@ -4,7 +4,7 @@ from deta import Deta
 from telebot import types
 from os import environ
 from airdrop import bot
-from airdrop.structure import (AirdropConfig, FormatedData, MessageIds, User)
+from airdrop.structure import (AirdropConfig, AirdropLangConf, AirdropLangUpdateID, FormatedData, MessageIds, User, AirdropCoreConfig)
 
 
 
@@ -20,18 +20,61 @@ def get_db(table='users'):
     return deta.Base('airdrop_'+table.strip())
 
 async def create_airdrop_config(lang='en'):
-    db = get_db('airdrop_config')
-    conf = db.put(AirdropConfig(language_code=lang).dict())
-    return AirdropConfig(**conf)
+    db = get_db('airdrop_lang_config')
+    airdrop_lang = AirdropLangConf(language_code=lang).dict()
+    airdrop_lang.pop('key')
+    conf = db.put(airdrop_lang)
+    return AirdropLangConf(**conf)
  
  
-async def fetch_user_conf(lang='en'):
-    db = get_db('airdrop_config')
-    query = db.fetch({'language_code': lang})
-    if query.count:
-        return AirdropConfig(**query.items[0])
+async def get_airdrop_core_config():
+    db = get_db('airdrop_core_config')
+    query = db.fetch()
+    if not query.count:
+        air_core_config = AirdropCoreConfig()
+        air_core_config_obj = air_core_config.dict()
+        air_core_config_obj.pop('key')
+        new_core = db.put(air_core_config_obj)
+        air_core_config = AirdropCoreConfig(**new_core)
     else:
-        return await create_airdrop_config(lang)
+        air_core_config = AirdropCoreConfig(**query.items[0])
+    return air_core_config
+
+        
+ 
+ 
+async def fetch_user_conf(lang='en', return_raw=False):
+    db = get_db('airdrop_lang_config')
+    airdrop_core = await get_airdrop_core_config()
+    query = db.fetch({'language_code': lang})
+    
+    if query.count:
+        lang_conf= AirdropLangConf(**query.items[0])
+    else:
+        lang_conf= await create_airdrop_config(lang)
+    
+    if not return_raw:
+        lang_conf = lang_conf.dict()
+        lang_conf.pop('key')
+        airdrop_core = airdrop_core.dict()
+        airdrop_core.pop('key')
+        return AirdropConfig(**lang_conf, **airdrop_core)
+    return(airdrop_core,lang_conf)
+    
+    
+    
+async def get_config_message_ids(lang='en'):
+    db = get_db('airdrop_lang_config_message_ids')
+    query = db.fetch({'language_code': lang})
+    if not query.count:
+        new_msg_ids = AirdropLangUpdateID(language_code=lang)
+        new_msg_ids_obj = new_msg_ids.dict()
+        new_msg_ids_obj.pop('key')
+        saved_msg_ids = db.put(new_msg_ids_obj)
+        lang_conf = AirdropLangUpdateID(**saved_msg_ids)
+    else:
+        lang_conf= AirdropLangUpdateID(**query.items[0])
+    return lang_conf, db
     
 
 async def update_db_object(item_to_update: (MessageIds or User or AirdropConfig), db_connection):
@@ -76,10 +119,10 @@ async def update_referral(user: User, airdrop_config: AirdropConfig,  user_db):
     refered_by.referrals += 1
     refered_by.referral_balance += airdrop_config.referral_amount
     asyncio.create_task(update_db_object(refered_by, user_db))
-    asyncio.create_task(send_message(refered_by.chat_id, f'Congratulations!🎊 someone registered using your referral code\nYou have earned 50 tokens',disable_notification=True))
+    asyncio.create_task(send_message(refered_by.user_id, f'Congratulations!🎊 someone registered using your referral code\nYou have earned 50 tokens',disable_notification=True))
 
 
-def replace_text_with_config(text: str, config: AirdropConfig = None, user: User = None): 
+def replace_text_with_config(text: str, config: AirdropConfig, user: User): 
     to_replace = [
                 
                 ('{per_ref}', config.referral_amount),
@@ -89,12 +132,15 @@ def replace_text_with_config(text: str, config: AirdropConfig = None, user: User
                 ('{tg_channel}', config.channel_username),
                 ('{min_ref}', config.min_referrals),
                 ('{max_ref}', config.max_referrals),
+                ('{extral}', config.extral_reward),
                 ('{symbol}', config.symbol),
+                ('{twitter}', config.twitter_link),
                 ('{name}', config.name),
                 ('{site}', config.website_link),
                 ('{lang}', user.language_code),
                 ('{bal}', user.balance),
-                ('{reffs}', user.referral_balance),
+                ('{ref_bal}', user.referral_balance),
+                ('{ref_count}', user.referrals),
                 ('{total_bal}', user.balance + user.referral_balance),
                 ('{verified}', user.is_bot),
                 ('{uid}', user.user_id),
@@ -114,7 +160,7 @@ async def send_message(to_object: (FormatedData or int),
     user_id = to_object.user_id if type(to_object) == FormatedData else to_object
 
     if file:
-        return await bot.send_document(user_id, file)
+        return await bot.send_document(user_id, file, visible_file_name=text)
     
     return await bot.send_message(user_id, text, reply_to_message_id=reply_to_message_id, 
                                       parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview, 

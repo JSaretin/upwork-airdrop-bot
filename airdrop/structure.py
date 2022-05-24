@@ -13,8 +13,8 @@ class User(BaseModel):
     accepted_terms: bool = False
     twitter_username: str = None
     is_bot: bool = True
-    balance: float = 0
-    referral_balance: float = 0
+    balance: int = 0
+    referral_balance: int = 0
     referral_link: str = None
     referral_code: str = None
     referrals: int = 0
@@ -55,176 +55,200 @@ class FormatedData(BaseModel):
     content_type: str = 'text'
     
 
-class AirdropConfig(BaseModel):
+class AirdropCoreConfig(BaseModel):
     key: str = None
-    language_code: str = 'en'
-    airdrop_status: bool = False
-    registration_amount: float = 500
-    referral_amount: float = 50
-    
-    min_referrals: int = 5
-    max_referrals: int = None
-    
     name: str = 'Versity'
     symbol: str = '$SITY'
-    website_link: str = 'https://helloversity.io'
+    website_link: str = 'https://www.versity.io'
     twitter_link: str = 'https://twitter.com/helloversity'
     retweet_post_link: str = 'https://twitter.com/helloversity/status/1234'
     group_username: str = '@Validationgrouptg'
     channel_username: str = '@validatonchanneltg'
-    
+    airdrop_status: bool = True
+    registration_amount: int = 500
+    referral_amount: int = 100
+    extral_reward: int = 50
+    min_referrals: int = 5
+    max_referrals: int = None
+    withdraw_date: str = '30 June 2022'
     send_error_message: bool = True
     send_error_to: str = '@lovelynCertk'
     
-    airdrop_closed_message: str = 'Airdrop is closed'
     
-    welcome_message: str = 'Welcome to the Airdrop Bot!'
+class AirdropLangConf(BaseModel):
+    key: str = None
+    language_code: str = 'en'
+    invalid : str= 'Invalid message'
+    airdrop_closed_message: str = 'Airdrop is closed'
+    config: str = 'change email click /remove_email\nchange wallet address click /remove_wallet\nto get the airdrop rules click /rules\n'
+    airdrop_rules: str = 'Submit your wallet and email'
+    reteet_post = 'Retweet the post'
+    
+    join_channel: str = 'Join channel to continue'
+    not_in_channel: str = 'You are not in the channel\np.s. join the channel to continue'
+    
+    welcome_message: str = '''Versity is the first real estate metaverse dedicated to professionals and individuals.
+
+
+
+The ICO is starting very soon.
+
+The first ICO backed by a French publicly traded company.
+
+
+
+🔰 More informations
+
+🟣 Website: {site}
+
+
+
+🔰 Follow us
+
+🟣 Telegram: {tg_group}
+
+🟣 Twitter: {twitter}
+
+First metaverse dedicated to real estate! | Versity
+Discover Versity is the first metaverse dedicated toreal estate serving professionals, investors and individuals.
+Telegram
+Versity
+The new age of real estate. 👉Versity.io 👉 {twitter}
+Twitter
+{twitter}
+    
+    '''
     not_bot_msg: str = 'enter the answer to the captcha'
     join_group_msg: str = 'Join group to continue'
     not_in_group_msg: str = 'You are not in the group\np.s. join the group to continue'
 
-    join_channel_msg: str = 'Join channel to continue'
-    not_in_channel_msg: str = 'You are not in the channel\np.s. join the channel to continue'
-    
-    
     ban_from_group_msg: str = 'You are banned from group'
     ban_from_channel_msg: str = 'You are banned from channel'
     
-    enter_verification_code_msg: str = 'Please enter the verification code'
-    wrong_verification_code_msg: str = 'Wrong verification code'
-    verification_code_saved_msg: str = 'Your verification code has been saved'
-    reply_to_verification_code_request_msg: str = 'To prove your are not a bot, reply to the verification answer request message or claick /start to get a new request'
+    ans_captcha: str = 'Please enter the verification code'
+    wrong_captcha: str = 'Wrong verification code'
+    captcha_verified: str = 'Your verification code has been saved'
+    reply_captcha: str = 'To prove your are not a bot, reply to the verification answer request message or click /start to get a new request'
 
-    address_exists_msg: str = 'Your address already exists, click /request_address to set a new one'
-    enter_wallet_address_msg: str = 'Please enter your Polygon address'
-    wallet_taken_msg: str = 'This wallet is registered to another account'
-    wallet_saved_msg: str = 'You wallet address has been saved'
-    reply_to_wallet_request_msg: str = 'To register your wallet address, reply to the wallet request message or claick /start to get a new request'
+    submit_wallet: str = 'Please enter your Polygon address'
+    wallet_used: str = 'Your address already exists, click /request_address to set a new one'
+    wallet_saved: str = 'You wallet address has been saved'
+    reply_wallet_request: str = 'To register your wallet address, reply to the wallet request message or click /start to get a new request'
     
-    email_exists_msg: str = 'Your email already exists, click /request_email to set a new one'
-    enter_email_msg: str = 'Please enter your email address'
-    email_taken_msg: str = 'This email is registered to another user'
-    email_saved_msg: str = 'Your email address have been registered'
-    reply_to_email_request_msg: str = 'To register your email, reply to the email request message or claick /start to get a new request'
-    
-    enter_twitter_link_msg : str= 'Please enter your twitter profile like\nlink must start with https://'
-    twitter_username_taken : str = 'This account is registered to another user'
-    twitter_username_saved: str = 'Your twitter username has been registerd'
-    reply_to_twitter_link_request_msg: str = 'To register your twitter username, reply to the twitter link request message or claick /start to get a new request'
-    
-    registration_complete_msg: str = 'Congratulations!🎊\naccount created successfully'
-    
-    dashboard_msg: str = 'Welcome to the dashboard'
+    submit_email : str = 'Please enter your email'
+    email_used : str = 'Your email already exists, click /request_email to set a new one'
+    email_saved : str = 'You email has been saved'
+    reply_email_request : str = 'To register your email, reply to the email request message or click /set_email to get a new request'
 
-    balance_msg: str = '*Balance*: {balance}\n*Referral Balance*: {referral_balance}\n*Total Balance*: {total_balance}\n*Referral Counts*: {referral_counts}'
-    referral_link_msg: str = 'To earn more {symbol}, send this link to your friends to receive {referral_amount} {symbol} per each referral {link}'
-
-    withdraw_msg: str = 'Token will be distributed on {withdraw_date}'
-    withdraw_date: str = '30 June 2022'
+    submit_twitter_link : str= 'Please enter your twitter profile like\nlink must start with https://'
+    twitter_used : str = 'this twitter profile already exists'
+    twitter_saved: str = 'twitter saved ✅'
+    reply_twitter_request: str = 'To register your twitter profile, reply to the twitter link request message or click /start to get a new request'
     
-    invalid_message : str= 'Invalid message'
-    airdrop_rules_msg: str = 'Submit your wallet and email'
-    terms_msg: str = 'airdrop terms'
+    account_created: str = 'Congratulations!🎊\naccount created successfully'
+    
+    dashboard: str = 'dashboard'
+    balance: str = '*Balance*: {bal}\n*Referral Balance*: {ref_bal}\n*Total Balance*: {total_bal}\n*Referral Counts*: {ref_count}'
+    referral_link: str = 'To earn more {symbol}, send this link to your friends to receive {per_ref} {symbol} per each referral {ref_link}'
+    withdraw: str = 'Token will be distributed on {date}'
+    task_completed_already: str = 'You have already completed this task'
+    
     
                             
-    
-    
-
-
-    
-class AirdropConfigMessageIDS(BaseModel):
-    key: str = None
-    airdrop_status: int = None
+class AirdropConfig(BaseModel):
+    name: str = None
+    symbol: str = None
+    website_link: str = None
+    twitter_link: str = None
+    retweet_post_link: str = None
+    group_username: str = None
+    channel_username: str = None
+    airdrop_status: bool = None
     registration_amount: int = None
     referral_amount: int = None
+    extral_reward: int = None
     min_referrals: int = None
     max_referrals: int = None
-    name: int = None
-    symbol: int = None
-    website_link: int = None
-    twitter_link: int = None
-    group_username: int = None
-    channel_username: int = None
-    send_error_message: int = None
-    send_error_to: int = None
-    airdrop_closed_message: int = None
-    welcome_message: int = None
-    not_bot_msg: int = None
-    join_group_msg: int = None
-    not_in_group_msg: int = None
-    join_channel_msg: int = None
-    not_in_channel_msg: int = None
-    ban_from_group_msg: int = None
-    ban_from_channel_msg: int = None
-    enter_verification_code_msg: int = None
-    wrong_verification_code_msg: int = None
-    verification_code_saved_msg: int = None
-    reply_to_verification_code_request_msg: int = None
-    address_exists_msg: int = None
-    enter_wallet_address_msg: int = None
-    wallet_taken_msg: int = None
-    wallet_saved_msg: int = None
-    reply_to_wallet_request_msg: int = None
-    email_exists_msg: int = None
-    enter_email_msg: int = None
-    email_taken_msg: int = None
-    email_saved_msg: int = None
-    reply_to_email_request_msg: int = None
-    enter_twitter_link_msg : int = None
-    twitter_username_taken : int = None
-    twitter_username_saved: int = None
-    reply_to_twitter_link_request_msg: int = None
-    registration_complete_msg: int = None
-    dashboard_msg: int = None
-    balance_msg: int = None
-    referral_link_msg: int = None
-    invalid_message: int = None
-    airdrop_rules_msg: int = None
-    terms_msg: int = None
-    
-    fr_send_error_message: int = None
-    fr_send_error_to: int = None
-    fr_airdrop_closed_message: int = None
-    fr_welcome_message: int = None
-    fr_not_bot_msg: int = None
-    fr_join_group_msg: int = None
-    fr_not_in_group_msg: int = None
-    fr_join_channel_msg: int = None
-    fr_not_in_channel_msg: int = None
-    fr_ban_from_group_msg: int = None
-    fr_ban_from_channel_msg: int = None
-    fr_enter_verification_code_msg: int = None
-    fr_wrong_verification_code_msg: int = None
-    fr_verification_code_saved_msg: int = None
-    fr_reply_to_verification_code_request_msg: int = None
-    fr_address_exists_msg: int = None
-    fr_enter_wallet_address_msg: int = None
-    fr_wallet_taken_msg: int = None
-    fr_wallet_saved_msg: int = None
-    fr_reply_to_wallet_request_msg: int = None
-    fr_email_exists_msg: int = None
-    fr_enter_email_msg: int = None
-    fr_email_taken_msg: int = None
-    fr_email_saved_msg: int = None
-    fr_reply_to_email_request_msg: int = None
-    fr_enter_twitter_link_msg : int = None
-    fr_twitter_username_taken : int = None
-    fr_twitter_username_saved: int = None
-    fr_reply_to_twitter_link_request_msg: int = None
-    fr_registration_complete_msg: int = None
-    fr_dashboard_msg: int = None
-    fr_balance_msg: int = None
-    fr_referral_link_msg: int = None
-    fr_invalid_message: int = None
-    fr_airdrop_rules_msg: int = None
-    fr_terms_msg: int = None
-    
-    brodecast_msg: int = None
-    
+    withdraw_date: str = None
+    send_error_message: bool = None
+    send_error_to: str = None
+    language_code: str = None
+    invalid : str= None
+    airdrop_closed_message: str = None
+    config: str = None
+    airdrop_rules: str = None
+    reteet_post: str = None
+    join_channel: str = None
+    not_in_channel: str = None
+    welcome_message: str = None
+    not_bot_msg: str = None
+    join_group_msg: str = None
+    not_in_group_msg: str = None
+    ban_from_group_msg: str = None
+    ban_from_channel_msg: str = None
+    ans_captcha: str = None
+    wrong_captcha: str = None
+    captcha_verified: str = None
+    reply_captcha: str = None
+    submit_wallet: str = None
+    wallet_used: str = None
+    wallet_saved: str = None
+    reply_wallet_request: str = None
+    submit_email : str = None
+    email_used : str = None
+    email_saved : str = None
+    reply_email_request : str = None
+    submit_twitter_link : str= None
+    twitter_used : str = None
+    twitter_saved: str = None
+    reply_twitter_request: str = None
+    account_created: str = None
+    dashboard: str = None
+    balance: str = None
+    referral_link: str = None
+    withdraw: str = None
+    task_completed_already: str = None
     
 
+class AirdropLangUpdateID(BaseModel):
+    key: str = None
+    language_code: str = 'en'
+    invalid : int = None
+    airdrop_closed_message: int = None 
+    config: int = None 
+    airdrop_rules: int = None 
+    reteet_post: int = None
+    join_channel: int = None 
+    not_in_channel: int = None 
+    welcome_message: int = None 
+    not_bot_msg: int = None 
+    join_group_msg: int = None 
+    not_in_group_msg: int = None 
+    ban_from_group_msg: int = None 
+    ban_from_channel_msg: int = None 
+    ans_captcha: int = None 
+    wrong_captcha: int = None 
+    captcha_verified: int = None 
+    reply_captcha: int = None 
+    submit_wallet: int = None 
+    wallet_used: int = None 
+    wallet_saved: int = None 
+    reply_wallet_request: int = None 
+    submit_email : int = None 
+    email_used : int = None 
+    email_saved : int = None 
+    reply_email_request : int = None 
+    submit_twitter_link : int = None
+    twitter_used : int = None 
+    twitter_saved: int = None 
+    reply_twitter_request: int = None 
+    account_created: int = None 
+    dashboard: int = None 
+    balance: int = None 
+    referral_link: int = None 
+    withdraw: int = None 
+    task_completed_already: int = None
     
-
 
 class InGroupCannellStatus(BaseModel):
     in_group: bool = False

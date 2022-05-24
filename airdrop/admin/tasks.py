@@ -31,30 +31,35 @@ async def run_get_users_stats(message: FormatedData, wait_message_id: int):
    
    
 async def run_export_users_data_to_csv(message: FormatedData, wait_message_id: int):
+    demo_user = User(user_id=1, first_name='demo', last_name='demo', username='demo',)
+    demo_dict = demo_user.dict()
+    
     user_db = get_db()
     query = user_db.fetch()   
     users = query.items
     while query.last:
         query = user_db.fetch(last=query.last)
         users += query.items
+        
+    main_users = []
+    for user in users:
+        user = User(**user)
+        user_dict = user.dict()
+        user_dict['user_id'] = str(user.user_id)
+        main_users.append(list(user_dict.values()))
     
     
-    # create a file in memory
-
+    file_name = 'users_data.csv'
+    
     file = io.StringIO()
     writer = csv.writer(file)
-
-    # write the header
-    writer.writerow(['id', 'user_id', 'email', 'address', 'username', 'verificatin_code', 'first_name', 'last_name', 'accepted_terms', 'twitter_username', 'is_bot', 'balance', 'referral_link', 'referrals', 'is_admin', 'language_code', 'registration_complete', 'language_set', 'group_status', 'channel_status'])
-    writer.writerows(users)
-
-    # write the data to the file
+    writer.writerow(list(demo_dict.keys()))
+    writer.writerows(main_users)
+    
     file.seek(0)
-
-    # send the file to the user
     tasks = [
+        send_message(message.chat_id, file_name, file=file),
         delete_message(message.chat_id, wait_message_id),
-        send_message(message.chat_id, 'users.csv', file=file, parse_mode='Markdown'),
     ]
     await asyncio.gather(*tasks)
 

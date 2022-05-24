@@ -1,11 +1,9 @@
 from os import environ
 from telebot.async_telebot import AsyncTeleBot as TeleBot
+from dotenv import load_dotenv
 
-
-
-
-bot = TeleBot(environ.get('BOT_TOKEN', '5303775819:AAGHnHmhPIUQDVxNYD9y5Z4uFZbbpwqNdwE'))
-
+load_dotenv('.env')
+bot = TeleBot(environ['BOT_TOKEN'])
 
 
 from airdrop import admin

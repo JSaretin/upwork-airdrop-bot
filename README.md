@@ -1,18 +1,22 @@
-A telegram airdrop
-
-## Features
-
-### For Users
-x [ ] User must join group and channel (and remain till airdrop ends)
-x [ ] User must follow Twitter account (Like and retweet a specific tweet)
-x [ ] User must submit a valid Polygon address
-x [ ] User must enter a valid email address
+# A telegram airdrop
 
 
-### For Admins
-x [ ] Will see a list of all users who have joined the airdrop
-x [ ] Stats on registered users (start bot, submited address, complete registration)
-x [ ] Brodecast message to users
-x [ ] Set retweets post
-x [ ] Set airdrop end date
-x [ ] Set airdrop status
+
+
+- Captcha
+- Multi language for users ( EN / FR / ES )
+- Referral system
+- Exporting data in .csv (wallet + balance)
+- Each mandatory step needs to be verified (the user cannot skip this step or write a fake account name for example)
+- Join TG chan
+- Join TG group
+- Follow Twitter account
+- RT a specific tweet
+- 
+- Extra steps with extra rewards :
+- Email address (needed to be checked)
+- Extra buttons :
+- informations : summary of the project
+- balance : show user balance
+- rules : show the rules of the airdrop
+- Possibility to send a message to all members

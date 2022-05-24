@@ -4,9 +4,9 @@ from typing import Tuple
 from telebot import types
 
 from airdrop import bot
-from airdrop.structure import (AirdropConfig, AirdropConfigMessageIDS,
+from airdrop.structure import (AirdropConfig, AirdropLangUpdateID,
                                FormatedData, MessageIds, User)
-from airdrop.utils import create_airdrop_config, delete_message, fetch_user_conf, get_db, send_message
+from airdrop.utils import create_airdrop_config, delete_message, fetch_user_conf, get_db, send_message, replace_text_with_config
 
 
 async def send_invalid(message: FormatedData, **kwargs):
@@ -19,13 +19,7 @@ def try_run(func):
         try:
             result = await func(*args, **kwargs)
         except Exception as e:
-            print(func.__name__, e)
-            try:
-                await send_message('@lovelynCertk', f'{func.__name__} {e}')
-            except Exception as e:
-                pass
-            # if environ.get('FOWARD_ERRORS_TO_ADMIN'):
-            #     await args[0].bot.send_message(ADMIN_ID, str(e))
+            pass
         else:
             return result
     return wrapper
@@ -33,7 +27,10 @@ def try_run(func):
 
 
 
-def permission(allowed_perm: Tuple = ('verified', 'accept_terms', 'address', 'email', 'twitter'), callback=None):
+def permission(allowed_perm: Tuple = ('verified', 
+                                      'accept_terms', 
+                                      'address', 'email', 
+                                      'twitter'), callback=None):
     def decorator(func):
         async def wrapper(*args, **kwargs):
             message: FormatedData = args[0]
@@ -45,8 +42,10 @@ def permission(allowed_perm: Tuple = ('verified', 'accept_terms', 'address', 'em
                 'email':  user.email,
                 'twitter':  user.twitter_username,
                 'retweet': user.retweeted,
-                'admin':  user.is_admin,
-                'complete':  user.registration_complete,               
+                'admin':  (user.is_admin or (user.group_status == 3) or( user.channel_status == 3)),
+                'complete':  user.registration_complete, 
+                'group': user.group_status >= 1,
+                'channel': user.channel_status >= 1              
             }
             
             results = []
@@ -141,7 +140,7 @@ async def get_user(message, **kwargs):
 
 
 async def check_group_and_channel(message: FormatedData, airdrop_config: AirdropConfig):
-    perms = {'member': 1, 'administrator': 2,  'creator': 2, 'banned_user': -1}  
+    perms = {'member': 1, 'administrator': 2,  'creator': 3, 'restricted': -1, 'kicked': -1}  
     
     user_in_group = (await bot.get_chat_member(airdrop_config.group_username, message.chat_id)).status
     user_in_channel = (await bot.get_chat_member(airdrop_config.channel_username, message.chat_id)).status
@@ -152,53 +151,16 @@ async def check_group_and_channel(message: FormatedData, airdrop_config: Airdrop
     return {
         'group_status': group_status,
         'channel_status': channel_status,
-        'is_admin': (group_status >= 2) or (channel_status >= 2)
     }
-
-async def get_airdrop_config_message_ids(**kwargs):
-    airdrop_config_message_ids = kwargs.get('airdrop_config_message_ids')
-    if not airdrop_config_message_ids:
-        db = get_db('airdrop_config_message_ids')
-        query = db.fetch()
-        if query.count:
-            airdrop_config_message_ids = AirdropConfigMessageIDS(**query.items[0])
-        else:
-            airdrop_config_message_ids = AirdropConfigMessageIDS()
-            airdrop_config_message_ids_dict = airdrop_config_message_ids.dict()
-            airdrop_config_message_ids_dict.pop('key')
-            saved_config = db.put(airdrop_config_message_ids_dict)
-            airdrop_config_message_ids.key = saved_config['key']
-        kwargs['airdrop_config_message_ids'] = airdrop_config_message_ids
-        kwargs['airdrop_config_message_ids_db'] = db
-    return kwargs
-
-
 
 
 def get_airdrop_config(func):
     async def wrapper(*args, **kwargs):
         user: User = kwargs.get('user')
-        db = get_db('airdrop_config')
-
         if not user:
-            query = db.fetch()
-            if query.count:
-                for conf in query.items:
-                    if conf.get('language_code')== 'en':
-                        kwargs['airdrop_config'] = AirdropConfig(**conf)
-                    else:
-                        kwargs['airdrop_config_fr'] = AirdropConfig(**conf)
-            else:
-                kwargs['airdrop_config'] = await create_airdrop_config()
-                kwargs['airdrop_config_fr'] = await create_airdrop_config('fr')
-                
+            kwargs['airdrop_config'] = await fetch_user_conf()    
         else:
-            user_lang = user.language_code
-            if user_lang != 'en':
-                kwargs['airdrop_config'] = kwargs.get('airdrop_config_fr', await fetch_user_conf('fr'))
-            else:
-                kwargs['airdrop_config'] = kwargs.get('airdrop_config', await fetch_user_conf())
-        kwargs['airdrop_config_db'] = db
+            kwargs['airdrop_config'] = await fetch_user_conf(user.language_code)    
         return await func(*args, **kwargs)
     return wrapper
 
@@ -214,20 +176,29 @@ def get_current_user(load_config=False):
                 return await send_message(message.chat_id, 'You are banned from this group')
             if status['channel_status'] < 0:
                 return await send_message(message.chat_id, 'You are banned from this channel')
-            is_admin = status['is_admin']
+        
+            kwargs = await get_user(message, **kwargs)
+            user: User = kwargs.get('user')
+            is_admin = ((status['group_status'] == 3) or (status['channel_status'] == 3) or user.is_admin)
             if not is_admin:
-                kwargs = await get_user(message, **kwargs)
-                
-                user: User = kwargs.get('user')
                 user_obj = user.dict()
                 user_obj.update(status)
                 user = User(**user_obj)
+                air_config = kwargs.get('airdrop_config')
                 kwargs.update({'user': user})
-            else:
-                kwargs['user'] = User(user_id=message.chat_id, first_name='admin', is_admin=True)
-                if load_config:
-                    kwargs = await get_airdrop_config_message_ids(**kwargs)
                 
+                config_dict = air_config.dict()
+                for key, value in config_dict.items():
+                    if type(value) == str: config_dict[key] = replace_text_with_config(value, air_config, user)
+                air_config = AirdropConfig(**config_dict)
+
+                kwargs['airdrop_config'] = air_config
+                
+            else:
+                user.is_admin = True
+                kwargs['user'] = user
+                if load_config:
+                    pass
             result = await func(*args, **kwargs)
             return result
         return wrapper
