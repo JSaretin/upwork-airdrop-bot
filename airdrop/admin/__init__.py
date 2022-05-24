@@ -1,143 +1,158 @@
-from airdrop import (AirdropConfig, AirdropConfigMessageIDS, FormatedData,
-                     asyncio, get_current_user, send_message, try_run, types,
-                     update_db_object, bot, Tuple, 
-                     delete_message, 
-                     handle_invalid_message, User)
+import asyncio
+from typing import Tuple
 
-from .tasks import run_export_users_data_to_csv, run_get_users_stats
+from airdrop import bot
+from airdrop.hooks import get_current_user, send_message, try_run, permission
+from airdrop.structure import (AirdropConfig, AirdropConfigMessageIDS,
+                               FormatedData, User)
+from airdrop.utils import create_airdrop_config, delete_message, fetch_user_conf, get_db, update_db_object
+from telebot import types
 
-
-def permission(allowed_perm: Tuple = ('admin')):
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            message: FormatedData = args[0]
-            user : User = kwargs['user']
-            perms = {
-                'admin':  user.is_admin
-            }
-            
-            failed_perms = list(filter(lambda perm: not perms.get(perm),  allowed_perm))
-            if len(failed_perms) > 0:
-                return await handle_invalid_message(message)
-            result = await func(*args, **kwargs)
-            return result
-        return wrapper
-    return decorator
- 
-
-def is_admin(func):
-   @try_run
-   @permission(('admin',))
-   async def wrapper(*args, **kwargs):
-      return await func(*args, **kwargs)
-   return wrapper
+from .tasks import (run_brodecast_message, run_export_users_data_to_csv,
+                    run_get_users_stats)
+from airdrop.user import start, handle_invalid_message
 
 
-def dashboard(message: FormatedData):
-       markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-       buttons = [
-          'export user data',
-          'get stats',
-          'get config',
-          
-       ]
-    
-def request_hook(func):
-   @get_current_user(load_config=True)
-   @is_admin
-   async def wrapper(*args, **kwargs):
-      message: FormatedData = args[0]
-      airdrop_config_message_ids : AirdropConfigMessageIDS = kwargs['airdrop_config']
-      
-      func_name = func.__name__
-      feild_name = func_name.replace('request_', '')
-      reqeust_text = f'enter the new '+ feild_name.replace('_', ' ')
-      sent_message = await send_message(message, reqeust_text, reply_markup=types.ForceReply())
-      
-      airdrop_config_message_ids_obj = airdrop_config_message_ids.dict()
-      airdrop_config_message_ids_obj[feild_name+'_id'] = sent_message.message_id
-      airdrop_config_message_ids = AirdropConfigMessageIDS(**airdrop_config_message_ids_obj)
 
-      asyncio.create_task(update_db_object(airdrop_config_message_ids, kwargs('airdrop_config_message_ids_db')))
-      
-      kwargs['airdrop_config_message_ids'] = airdrop_config_message_ids
-      result = await func(*args, **kwargs)
-      return result
-   return wrapper
- 
+async def show_dashboard(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    buttons = [
+        '📊 Users Stats',
+        '⬇️ Export Users Data',
+        '⚙️ Settings',
+        '📢 Broadcast',
+    ]
+    markup.add(*buttons)
+    asyncio.create_task(send_message(message, 'admin dashboard', reply_markup=markup))
+
+new_config_message_ids = AirdropConfigMessageIDS()
+new_config_message_ids_obj = new_config_message_ids.dict()
+keys = list(new_config_message_ids_obj.keys())
+keys.remove('key')
+keys.remove('brodecast_msg')
 
 
+@bot.message_handler(commands=['start'])
 @get_current_user()
-@is_admin
-async def get_available_config_commands(message: FormatedData, **kwargs):
-    available_commands = '''
-/set_welcome_message  - to set a new welcome message
-/set_request_twitter_post_retweet_message  - to set a new request twitter post retweet message
-/set_twitter_post_retweet_link_message  - to set a new twitter post retweet link message
-/set_group_message  - to set a new join group message
-/set_channel_message  - to set a new join channel message
-/set_enter_address_message  - to set a new enter address message
-/set_address_already_used_message  - to set a new address already used message
-/set_address_save_message  - to set a new address save message
-/set_enter_email_message  - to set a new enter email message
-/set_email_already_used_message  - to set a new email already used message
-/set_email_save_message  - to set a new email save message
-/set_enter_twitter_username_message  - to set a new enter twitter username message
-/set_twitter_username_already_used_message  - to set a new twitter username already used message
-/set_twitter_username_save_message  - to set a new twitter username save message
-/set_enter_verification_code_message  - to set a new enter verification code message
-/set_wrong_verification_code_message  - to set a new wrong verification code message
-/set_invalid_message_message  - to set a new invalid message message
-/set_captcha_message  - to set a new captcha message
-/set_dashboard_message  - to set a new dashboard message
-/set_join_group_message  - to set a new join group message
-/set_join_channel_message  - to set a new join channel message
-/set_ban_from_group_message  - to set a new ban from group message
-/set_ban_from_channel_message  - to set a new ban from channel message
-/set_reply_to_address_request_message  - to set a new reply to address request message
-/set_reply_to_email_request_message  - to set a new reply to email request message
-/set_airdrop_rules_message  - to set a new airdrop rules message
-    '''
-    asyncio.create_task(send_message(message, available_commands))
-    
- 
-    
+@permission(('admin',), callback=start)
+async def dashboard(message: FormatedData, **kwargs):
+    if message.msg_text != '/start':
+        await handle_set_airdrop_configs(message, **kwargs)
+    await show_dashboard(message)
+
+
+@bot.message_handler(regexp='📊 Users Stats')
 @get_current_user()
-@is_admin
+@permission(('admin', ), callback=start)
 async def get_users_stats(message: FormatedData, **kwargs):
     sent_msg = await send_message(message.chat_id, 'processing....')
-    asyncio.create_task(run_get_users_stats(message, kwargs['user_db'], sent_msg.id))
+    asyncio.create_task(run_get_users_stats(message, sent_msg.id))
 
 
-
+@bot.message_handler(regexp='⬇️ Export Users Data')
 @get_current_user()
-@is_admin
+@permission(('admin', ), callback=start)
 async def export_users_data_to_csv(message: FormatedData, **kwargs):
     sent_msg = await send_message(message.chat_id, 'exporting....')
-    asyncio.create_task(run_export_users_data_to_csv(message, kwargs['user_db'], sent_msg.id))
+    asyncio.create_task(run_export_users_data_to_csv(message, sent_msg.id))
 
 
 
-
+@bot.message_handler(regexp='⚙️ Settings')
+@bot.message_handler(commands=['settings', 'setting', 'config', 'configuration'])
 @get_current_user()
-@is_admin
-async def set_airdrop_confirg(message: FormatedData, **kwargs):
+@permission(('admin', ), callback=start)
+async def get_settings(message: FormatedData, **kwargs):
+    text = '\n'.join([f'/{key} : to set {key.replace("msg", "message").replace("_", " ")}' for key in keys])
+    lines = text.split('\n')
+    part_1 = '\n'.join(lines[:len(lines)//2])
+    part_2 = '\n'.join(lines[len(lines)//2:])
+    await send_message(message.chat_id, part_1)
+    await send_message(message.chat_id, part_2)
+    
+
+@bot.message_handler(regexp='📢 Broadcast')
+@get_current_user(load_config=True)
+@permission(('admin', ), callback=start)
+async def broadcast(message: FormatedData, **kwargs):
+    sent_msg = await send_message(message.chat_id, 'enter the message to broadcast', reply_markup=types.ForceReply())
     airdrop_config_message_ids : AirdropConfigMessageIDS = kwargs['airdrop_config_message_ids']
-    airdrop_config: AirdropConfig = kwargs['airdrop_config']
+    if airdrop_config_message_ids.brodecast_msg: asyncio.create_task(delete_message(message, airdrop_config_message_ids.brodecast_msg))
+    airdrop_config_message_ids.brodecast_msg = sent_msg.message_id
+    asyncio.create_task(update_db_object(airdrop_config_message_ids, kwargs['airdrop_config_message_ids_db']))
     
+
+
+
+
+@bot.message_handler(commands=keys)
+@get_current_user(load_config=True)
+@permission(('admin', ), callback=start)
+async def show_config_commands(message: FormatedData, **kwargs):
+    command = message.msg_text.strip().replace('/', '')
+
+    airdrop_config_message_ids: AirdropConfigMessageIDS = kwargs['airdrop_config_message_ids']
     airdrop_config_message_ids_obj = airdrop_config_message_ids.dict()
-    keys, values = list(airdrop_config_message_ids_obj.keys()), \
-                    list(airdrop_config_message_ids_obj.values())
-    if not message.reply_to_msg_id or message.reply_to_msg_id not in values:
-        return await send_message(message, 'please reply to the message that you want to change')
+    to_update = airdrop_config_message_ids_obj.get(command)
 
-    key = keys[values.index(message.reply_to_msg_id)]
+    if to_update: asyncio.create_task(delete_message(message, to_update))
     
+    if command.startswith('fr_'):
+        airdrop_config: AirdropConfig = kwargs['airdrop_config_fr']
+    else:
+        airdrop_config: AirdropConfig = kwargs['airdrop_config']
+    await send_message(message, f'*current value*\n\n{airdrop_config.dict()[command.replace("fr_", "")]}', parse_mode='Markdown')
+    sent_msg = await send_message(message, f'enter your new {command.replace("fr_", "Frence").replace("_", " ")}', reply_markup=types.ForceReply())
+    airdrop_config_message_ids_obj.update({command: sent_msg.message_id})
+    airdrop_config_message_ids = AirdropConfigMessageIDS(**airdrop_config_message_ids_obj)
+    asyncio.create_task(update_db_object(airdrop_config_message_ids, kwargs['airdrop_config_message_ids_db']))
+
+
+
+
+
+@bot.message_handler()
+@get_current_user(load_config=True)
+@permission(('admin', ), callback=handle_invalid_message)
+async def handle_set_airdrop_configs(message: FormatedData, **kwargs):    
+    airdrop_config_message_ids: AirdropConfigMessageIDS = kwargs['airdrop_config_message_ids']
+    airdrop_config_message_ids_obj = airdrop_config_message_ids.dict()
+    request_keys = list(airdrop_config_message_ids_obj.keys())
+    request_value = list(airdrop_config_message_ids_obj.values())
+    if not message.reply_to_msg_id:
+        asyncio.create_task(send_message(message, 'invalid message📛: reply to the replace request if you want to update a message or value or click /settings to get the config list'))
+        return
+    if message.reply_to_msg_id not in request_value:
+        asyncio.create_task(send_message(message, 'You have replied to an invalid or expired request\nclick /settings a list of available configs'))
+        return 
+    
+    message_text = message.msg_text
+
+    key = request_keys[request_value.index(message.reply_to_msg_id)]
+        
+    if key == 'brodecast_msg':
+        sent_msg = await send_message(message, 'sending message, you will get a notification when done ✅')
+        asyncio.create_task(show_dashboard(message))
+        asyncio.create_task(run_brodecast_message(message, sent_msg.message_id))
+        airdrop_config_message_ids_obj[key] = None
+        airdrop_config_message_ids = AirdropConfigMessageIDS(**airdrop_config_message_ids_obj)
+        asyncio.create_task(update_db_object(airdrop_config_message_ids, kwargs['airdrop_config_message_ids_db']))
+        return
+    if key.startswith('fr_'):
+        airdrop_config: AirdropConfig = kwargs.get('airdrop_config_fr', await fetch_user_conf('fr'))
+    else:
+        airdrop_config: AirdropConfig = kwargs['airdrop_config']
     airdrop_config_obj = airdrop_config.dict()
-    airdrop_config_obj[key.replace('_id', '')] = message.text
-    
+    airdrop_config_obj.update({key: message_text})
     airdrop_config = AirdropConfig(**airdrop_config_obj)
-    
     asyncio.create_task(update_db_object(airdrop_config, kwargs['airdrop_config_db']))
-    asyncio.create_task(send_message(message, 'done'))
-
+    
+    asyncio.create_task(send_message(message, f'*{key.replace("_", " ")}* set ✅', parse_mode='Markdown'))
+    
+    airdrop_config_message_ids_obj[key] = None
+    airdrop_config_message_ids = AirdropConfigMessageIDS(**airdrop_config_message_ids_obj)
+    asyncio.create_task(update_db_object(airdrop_config_message_ids, kwargs['airdrop_config_message_ids_db']))
+    
+    await show_dashboard(message)
+    
+    
