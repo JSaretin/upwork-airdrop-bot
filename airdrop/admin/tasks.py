@@ -3,10 +3,11 @@ import csv
 import io
 
 from airdrop.structure import FormatedData, User
-from airdrop.utils import delete_message, send_message
+from airdrop.utils import delete_message, get_db, send_message
 
 
-async def run_get_users_stats(message: FormatedData, user_db, wait_message_id: int):
+async def run_get_users_stats(message: FormatedData, wait_message_id: int):
+    user_db = get_db()
     query = user_db.fetch()   
     users = query.items
     while query.last:
@@ -29,7 +30,8 @@ async def run_get_users_stats(message: FormatedData, user_db, wait_message_id: i
     await send_message(message.chat_id, formated_message, parse_mode='Markdown') 
    
    
-async def run_export_users_data_to_csv(message: FormatedData, user_db, wait_message_id: int):
+async def run_export_users_data_to_csv(message: FormatedData, wait_message_id: int):
+    user_db = get_db()
     query = user_db.fetch()   
     users = query.items
     while query.last:
@@ -59,14 +61,16 @@ async def run_export_users_data_to_csv(message: FormatedData, user_db, wait_mess
     file.close()
 
 
-async def run_brodecast_message(message: FormatedData, user_db, wait_message_id: int):
+async def run_brodecast_message(message: FormatedData, wait_message_id: int):
+    user_db = get_db()
     query = user_db.fetch()   
+    
     users = query.items
     while query.last:
         query = user_db.fetch(last=query.last)
         users += query.items
     
-    await asyncio.gather(*[send_message(user.user_id, message.msg_text, parse_mode='Markdown') for user in users])
+    await asyncio.gather(*[send_message(user['user_id'], message.msg_text, parse_mode='Markdown') for user in users])
     
     asyncio.create_task(delete_message(message.chat_id, wait_message_id))
     await send_message(message.chat_id, 'Message sent!')
