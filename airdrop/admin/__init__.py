@@ -138,16 +138,19 @@ async def handle_set_airdrop_configs(message: FormatedData, **kwargs):
         airdrop_config_message_ids = AirdropConfigMessageIDS(**airdrop_config_message_ids_obj)
         asyncio.create_task(update_db_object(airdrop_config_message_ids, kwargs['airdrop_config_message_ids_db']))
         return
+    
     if key.startswith('fr_'):
         airdrop_config: AirdropConfig = kwargs.get('airdrop_config_fr', await fetch_user_conf('fr'))
+        key = key.replace('fr_', '')
     else:
         airdrop_config: AirdropConfig = kwargs['airdrop_config']
+        
     airdrop_config_obj = airdrop_config.dict()
     airdrop_config_obj.update({key: message_text})
     airdrop_config = AirdropConfig(**airdrop_config_obj)
     asyncio.create_task(update_db_object(airdrop_config, kwargs['airdrop_config_db']))
     
-    asyncio.create_task(send_message(message, f'*{key.replace("_", " ")}* set ✅', parse_mode='Markdown'))
+    asyncio.create_task(send_message(message, f'*{key.replace("fr_", "French_").replace("_", " ")}* set ✅', parse_mode='Markdown'))
     
     airdrop_config_message_ids_obj[key] = None
     airdrop_config_message_ids = AirdropConfigMessageIDS(**airdrop_config_message_ids_obj)
