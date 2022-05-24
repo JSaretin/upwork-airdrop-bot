@@ -36,11 +36,8 @@ def try_run(func):
 def permission(allowed_perm: Tuple = ('verified', 'accept_terms', 'address', 'email', 'twitter'), callback=None):
     def decorator(func):
         async def wrapper(*args, **kwargs):
-            # print(func.__name__)
-            # print(allowed_perm)
             message: FormatedData = args[0]
             user : User = kwargs['user']
-            # print(user)
             perms = {
                 'verified': user.is_bot == False,
                 'accept_terms':  user.accepted_terms,
