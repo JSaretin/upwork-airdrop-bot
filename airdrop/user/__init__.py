@@ -316,7 +316,7 @@ async def check_user_in_group_handler(message: FormatedData, **kwargs):
         return
     user.group_status = 1
     await bot.edit_message_reply_markup(message.chat_id, message.reply_to_msg_id, reply_markup=None)
-    await send_message(message, 'task completed ✅')
+    await send_message(message, airdrop_config.task_complete)
     await start(message, **kwargs)
     return
     
@@ -331,7 +331,7 @@ async def check_user_in_channel_handler(message: FormatedData, **kwargs):
         return
     user.channel_status = 1
     await bot.edit_message_reply_markup(message.chat_id, message.reply_to_msg_id, reply_markup=None)
-    await send_message(message, 'task completed ✅')
+    await send_message(message, airdrop_config.task_complete)
     await start(message, **kwargs)
     
 
