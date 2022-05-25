@@ -64,6 +64,7 @@ airdrop_user_conf = AirdropLangConf()
 airdrop_user_conf_obj = airdrop_user_conf.dict()
 user_conf_keys = list(airdrop_user_conf_obj.keys())
 user_conf_keys.remove('key')
+user_conf_keys.remove('language_code')
 frence_users_conf_keys = ['fr_'+key for key in user_conf_keys]
 
 
