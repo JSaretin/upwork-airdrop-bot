@@ -120,7 +120,7 @@ async def request_wallet_address(message: FormatedData, **kwargs):
 
 
 @bot.message_handler(commands=['set_email'])
-@bot.message_handler(regexp='^add email$')
+@bot.message_handler(regexp='^email ✉️ = 🎁$')
 @get_current_user()
 @get_validation_ids
 async def request_email(message: FormatedData, **kwargs):
