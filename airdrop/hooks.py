@@ -192,6 +192,8 @@ def get_current_user(load_config=False):
                     if type(value) == str: config_dict[key] = replace_text_with_config(value, air_config, user)
                 air_config = AirdropConfig(**config_dict)
 
+                if not air_config.airdrop_status:
+                    return await send_message(message.chat_id, air_config.airdrop_closed_message);
                 kwargs['airdrop_config'] = air_config
                 
             else:
