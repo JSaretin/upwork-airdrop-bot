@@ -185,9 +185,12 @@ def get_current_user(load_config=False):
                 user_obj = user.dict()
                 user_obj.update(status)
                 user = User(**user_obj)
-                air_config = kwargs.get('airdrop_config')
+                air_config: AirdropConfig = kwargs.get('airdrop_config')
                 kwargs.update({'user': user})
                 
+                if user.language_code != air_config.language_code:
+                    air_config = await fetch_user_conf(user.language_code)
+                    
                 config_dict = air_config.dict()
                 for key, value in config_dict.items():
                     if type(value) == str: config_dict[key] = replace_text_with_config(value, air_config, user)
