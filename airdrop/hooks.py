@@ -172,10 +172,11 @@ def get_current_user(load_config=False):
         async def wrapper(*args, **kwargs):
             message: FormatedData = args[0]
             status = await check_group_and_channel(message, kwargs['airdrop_config'])
+            airdrop_config: AirdropConfig = kwargs['airdrop_config']
             if status['group_status'] < 0:
-                return await send_message(message.chat_id, 'You are banned from this group')
+                return await send_message(message.chat_id, airdrop_config.ban_from_group_msg)
             if status['channel_status'] < 0:
-                return await send_message(message.chat_id, 'You are banned from this channel')
+                return await send_message(message.chat_id, airdrop_config.ban_from_channel_msg)
         
             kwargs = await get_user(message, **kwargs)
             user: User = kwargs.get('user')
