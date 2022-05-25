@@ -133,11 +133,15 @@ Twitter
     submit_wallet: str = 'Please enter your Polygon address'
     wallet_used: str = 'Your address already exists, click /request_address to set a new one'
     wallet_saved: str = 'You wallet address has been saved'
+    wallet_removed: str = 'Wallet removed 🙈'
+    no_wallet_found: str = 'No wallet found'
     reply_wallet_request: str = 'To register your wallet address, reply to the wallet request message or click /start to get a new request'
     
     submit_email : str = 'Please enter your email'
     email_used : str = 'Your email already exists, click /request_email to set a new one'
     email_saved : str = 'You email has been saved'
+    email_removed: str = 'Your email has been removed'
+    no_email_found: str = 'No email found'
     reply_email_request : str = 'To register your email, reply to the email request message or click /set_email to get a new request'
 
     submit_twitter_link : str= 'Please enter your twitter profile like\nlink must start with https://'
@@ -151,6 +155,7 @@ Twitter
     balance: str = '*Balance*: {bal}\n*Referral Balance*: {ref_bal}\n*Total Balance*: {total_bal}\n*Referral Counts*: {ref_count}'
     referral_link: str = 'To earn more {symbol}, send this link to your friends to receive {per_ref} {symbol} per each referral {ref_link}'
     withdraw: str = 'Token will be distributed on {date}'
+    task_complete: str = 'Task completed ✅'
     task_completed_already: str = 'You have already completed this task'
     
     
@@ -193,10 +198,14 @@ class AirdropConfig(BaseModel):
     submit_wallet: str = None
     wallet_used: str = None
     wallet_saved: str = None
+    wallet_removed: str = 'Wallet removed 🙈'
+    no_wallet_found: str = 'No wallet found'
     reply_wallet_request: str = None
     submit_email : str = None
     email_used : str = None
     email_saved : str = None
+    email_removed: str = 'Your email has been removed'
+    no_email_found: str = 'No email found'
     reply_email_request : str = None
     submit_twitter_link : str= None
     twitter_used : str = None
@@ -207,6 +216,7 @@ class AirdropConfig(BaseModel):
     balance: str = None
     referral_link: str = None
     withdraw: str = None
+    task_complete: str = 'Task completed ✅'
     task_completed_already: str = None
     
 
@@ -233,10 +243,14 @@ class AirdropLangUpdateID(BaseModel):
     submit_wallet: int = None 
     wallet_used: int = None 
     wallet_saved: int = None 
+    wallet_removed: int = None
+    no_wallet_found: int = None
     reply_wallet_request: int = None 
     submit_email : int = None 
     email_used : int = None 
-    email_saved : int = None 
+    email_saved : int = None
+    email_removed: int = None 
+    no_email_found: int = None
     reply_email_request : int = None 
     submit_twitter_link : int = None
     twitter_used : int = None 
@@ -247,6 +261,7 @@ class AirdropLangUpdateID(BaseModel):
     balance: int = None 
     referral_link: int = None 
     withdraw: int = None 
+    task_complete: int = None
     task_completed_already: int = None
     
 

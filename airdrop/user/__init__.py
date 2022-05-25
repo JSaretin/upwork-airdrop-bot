@@ -450,10 +450,11 @@ async def twitter_link_submition_handler(message: FormatedData, **kwargs):
 @permission(allowed_perm=('verified', 'accept_terms', 'address'), callback=start)
 async def remove_wallet_handler(message: FormatedData, **kwargs):
     user: User = kwargs['user']
-    if not user.address: return await send_message(message, 'You don\'t have a wallet 🤷‍♂️')
+    airdrop_config: AirdropConfig = kwargs['airdrop_config']
+    if not user.address: return await send_message(message, airdrop_config.no_wallet_found)
     user.address = None
     asyncio.create_task(update_db_object(user, kwargs['user_db']))
-    await send_message(message, 'Wallet removed 🙈')
+    await send_message(message, airdrop_config.wallet_removed)
     await start(message, **kwargs)
     
     
@@ -463,11 +464,11 @@ async def remove_wallet_handler(message: FormatedData, **kwargs):
 async def remove_email_handler(message: FormatedData, **kwargs):
     user: User = kwargs['user']
     airdrop_config: AirdropConfig = kwargs['airdrop_config']
-    if not user.email: return await send_message(message, 'You don\'t have an email 🤷‍♂️')
+    if not user.email: return await send_message(message, airdrop_config.no_email_found)
     user.email = None
     user.balance -= airdrop_config.extral_reward
     asyncio.create_task(update_db_object(user, kwargs['user_db']))
-    await send_message(message, 'Email removed 🙈')
+    await send_message(message, airdrop_config.email_removed)
     await start(message, **kwargs)
 
     
@@ -480,7 +481,7 @@ async def retweeted_callback_handler(message: FormatedData, **kwargs):
     airdrop_config: AirdropConfig = kwargs['airdrop_config']
     user: User = kwargs['user']
     if user.retweeted: 
-        await send_message(message, 'task already completed ☑️')
+        await send_message(message, airdrop_config.task_completed_already)
         return
     user_db = kwargs['user_db']
     
@@ -492,7 +493,7 @@ async def retweeted_callback_handler(message: FormatedData, **kwargs):
     kwargs['user'] = user
     
     await bot.edit_message_reply_markup(message.chat_id, message.reply_to_msg_id, reply_markup=None)
-    await send_message(message, 'task completed ☑️')
+    await send_message(message, airdrop_config.task_complete)
     asyncio.create_task(update_db_object(user, user_db))
     await send_message(message, airdrop_config.account_created)
     await start(message, **kwargs)
