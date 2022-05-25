@@ -45,7 +45,7 @@ async def request_language(message, **kwargs):
 async def send_captcha_message(message: FormatedData, **kwargs):
     user: User = kwargs['user']
     message_ids: MessageIds = kwargs['message_ids']
-    # airdrop_config: AirdropConfig = kwargs['airdrop_config']
+    airdrop_config: AirdropConfig = kwargs['airdrop_config']
     verification_code = f'{random.randint(1, 10)} {random.choice(["+", "-", "x"])} {random.randint(1, 10)}'
     verification_result = eval(verification_code.replace('x', '*'))
     user.verificatin_code = str(verification_result)
@@ -55,7 +55,7 @@ async def send_captcha_message(message: FormatedData, **kwargs):
         
     # sent_msg = bot.send_photo(user.user_id, open('verification.png', 'rb'))
     cap_msg = await send_message(message, verification_code)
-    sent_msg = await send_message(message, 'Please, enter the result of the equation above:', 
+    sent_msg = await send_message(message, airdrop_config.ans_captcha, 
                      reply_to_message_id=cap_msg.message_id, reply_markup=types.ForceReply())
     message_ids.captcha_msg_id = sent_msg.message_id
     asyncio.create_task(update_db_object(message_ids, kwargs['message_ids_db']))
