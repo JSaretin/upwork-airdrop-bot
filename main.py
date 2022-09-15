@@ -5,12 +5,18 @@ from airdrop import bot
 from telebot import types
 from secrets import token_urlsafe
 
+from pydantic import BaseModel
+
+token =token_urlsafe(10)
+class Form(BaseModel): 
+  domain: str
+
 
 app = FastAPI()
 
 @app.get('/')
 async def root():
-    '<h1 onclick="()=>{prompt('+ 'Waaa'+')}" style="font-size: 500px; color: red;">Hey</h1>'
+    return {'status': 200}
 
 
 @app.put('/toggle')
@@ -19,12 +25,15 @@ async def delete():
 
 
 @app.post('/toggle')
-async def set_webhook(header: Optional[str] = Header(None)):
-  origin = header.get('Origin', '*')
-  await bot.set_webhook(f'https://{origin}/{token_urlsafe(32)}')
+async def set_webhook(form: Form):
+  try:
+    await bot.set_webhook(f'https://{form.domain}/{token}')
+  except Exception as e:
+    return str(e)
+  return {'status': 200}
   
 
-@app.post('/')
+@app.post('/{token}')
 async def webhook(update: dict):
     if update:
         update = types.Update.de_json(update)
