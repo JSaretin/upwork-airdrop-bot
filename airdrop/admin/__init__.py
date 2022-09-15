@@ -210,7 +210,7 @@ async def handle_set_airdrop_configs(message: FormatedData, **kwargs):
         core_main = await get_airdrop_core_config()
         core_main_dict = core_main.dict()
         _key = keys[values.index(message.reply_to_msg_id)]
-        core_main_dict[_key] = message.msg_text.replace('/', '')
+        core_main_dict[_key] = message.msg_text
         core_main = AirdropCoreConfig(**core_main_dict)
         asyncio.create_task(update_db_object(core_main, get_db('airdrop_core_config')))
         await send_message(message, '✅ done')
