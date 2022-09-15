@@ -1,14 +1,23 @@
 import asyncio
 from typing import Tuple
-
+from time import time
 from telebot import types
-
+import sqlite3
 from airdrop import bot
 from airdrop.structure import (AirdropConfig, AirdropLangUpdateID,
                                FormatedData, MessageIds, User)
 from airdrop.utils import create_airdrop_config, delete_message, fetch_user_conf, get_db, send_message, replace_text_with_config
 
 
+db = sqlite3.connect('/tmp/users.db')
+with db as c:
+    db.execute('''
+            CREATE TABLE IF NOT EXISTS "last_message" (
+                "user_id"	INTEGER NOT NULL UNIQUE,
+                "timer"	INTEGER NOT NULL DEFAULT 0
+            );
+            ''')
+    
 async def send_invalid(message: FormatedData, **kwargs):
     from airdrop.user import handle_invalid_message
     return await handle_invalid_message(message, **kwargs)
@@ -58,6 +67,7 @@ def permission(allowed_perm: Tuple = ('verified',
             if all(results):
                 return await func(*args, **kwargs)
             if callback:
+                kwargs['recall'] = True
                 return await callback(*args, **kwargs)
             return await send_invalid(message, **kwargs)
         return wrapper
@@ -68,7 +78,8 @@ def permission(allowed_perm: Tuple = ('verified',
 def format_data(func):
     async def wrapper(*args, **kwargs):
         message = args[0]
-        if type(message) == types.CallbackQuery:
+        message_type = type(message)
+        if message_type == types.CallbackQuery:
             reply_to = (message.message.message_id or 
                         message.message.reply_to_message.message_id if 
                                                     message.message else None)
@@ -87,7 +98,7 @@ def format_data(func):
                 'content_type': message.message.content_type,
                 'replied_message_text': message.message.text
             }
-        elif type(message) == types.Message:
+        elif message_type == types.Message:
             data = {
                 'id': message.message_id,
                 'user_id': message.from_user.id,
@@ -111,6 +122,25 @@ def format_data(func):
         formated_data = FormatedData(**data)
         if formated_data.chat_type != 'private':
             return 
+        
+        if not (kwargs.get('recall')) and message_type not in (types.CallbackQuery, types.Message):
+            conn = db.cursor()
+            conn.execute(f'select timer from last_message where user_id={formated_data.chat_id}')
+            result = conn.fetchone()
+            with db as c:
+                try:
+                    if not result:
+                        c.execute(f'insert into last_message (user_id, timer) values ({formated_data.chat_id}, {int(time())})')
+                    else:
+                        diff = time() - result[0]
+                        if (diff) < 2:
+                            # your last request is still proccessing
+                            await send_message(formated_data,  'your last request is still processing')
+                            return
+                        c.execute(f'update last_message set timer={int(time())} where user_id={formated_data.chat_id}')
+                except:
+                    return
+            
         result = await func(formated_data, **kwargs)
         return result            
     return wrapper
