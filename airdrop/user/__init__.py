@@ -194,7 +194,7 @@ async def dashboard(message: FormatedData, **kwargs):
     extral = ['config ⚙️']
     
     if not user.email:
-        extral.append('email ✉️ = 🎁')
+        extral.append('email ✉️')
     markup.add(*extral)
     
 
@@ -233,8 +233,8 @@ async def start(message: FormatedData, **kwargs):
     if not user.address:
         return await request_wallet_address(message, **kwargs)
     
-    # if not user.email:
-    #     return await request_email(message, **kwargs)
+    if not user.email:
+        return await request_email(message, **kwargs)
     
     if not user.twitter_username:
         return await request_twitter_user_link(message, **kwargs)
@@ -256,6 +256,7 @@ async def select_language(message: FormatedData, **kwargs):
     user.language_code = message.msg_text.split('_')[-1]
     user.selected_lang = True
     asyncio.create_task(update_db_object(user, kwargs['user_db']))
+    kwargs['recall'] = True
     await start(message, **kwargs)
 
 
@@ -280,12 +281,14 @@ async def confirm_verification_handler(message: FormatedData, **kwargs: Dict):
     if message.msg_text != user.verificatin_code:
         await delete_message(message.chat_id, [message_ids.captcha_msg_id-1, message_ids.captcha_msg_id, message.id][::-1])
         await send_message(message, airdrop_config.wrong_captcha),
+        kwargs['recall'] = True
         await start(message, **kwargs)
         return
     
     user.is_bot = False
     await send_message(message, airdrop_config.captcha_verified)
     asyncio.create_task(update_db_object(user, kwargs['user_db']))
+    kwargs['recall'] = True
     await start(message, **kwargs)
     
     
@@ -302,6 +305,7 @@ async def accept_terms_callback_handler(message: FormatedData, **kwargs):
     asyncio.create_task(update_db_object(user, kwargs['user_db']))
     await bot.edit_message_text(message.replied_message_text, message.chat_id, message.reply_to_msg_id)
 
+    kwargs['recall'] = True
     await start(message, **kwargs)
 
 
@@ -317,6 +321,7 @@ async def check_user_in_group_handler(message: FormatedData, **kwargs):
     user.group_status = 1
     await bot.edit_message_reply_markup(message.chat_id, message.reply_to_msg_id, reply_markup=None)
     await send_message(message, airdrop_config.task_complete)
+    kwargs['recall'] = True
     await start(message, **kwargs)
     return
     
@@ -332,6 +337,7 @@ async def check_user_in_channel_handler(message: FormatedData, **kwargs):
     user.channel_status = 1
     await bot.edit_message_reply_markup(message.chat_id, message.reply_to_msg_id, reply_markup=None)
     await send_message(message, airdrop_config.task_complete)
+    kwargs['recall'] = True
     await start(message, **kwargs)
     
 
@@ -367,13 +373,14 @@ async def register_address_handler(message: FormatedData, **kwargs):
     asyncio.create_task(update_db_object(user, user_db))
 
     await send_message(message, airdrop_config.wallet_saved, reply_to_message_id=message.id)
+    kwargs['recall'] = True
     await start(message, **kwargs)
 
 
 
 @bot.message_handler(regexp='^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 @get_current_user()
-@permission(allowed_perm=('verified', 'accept_terms', 'address', 'complete'), callback=start)
+@permission(allowed_perm=('verified', 'accept_terms', 'address'), callback=start)
 @get_validation_ids
 async def register_email_handler(message: FormatedData, **kwargs):
     airdrop_config: AirdropConfig = kwargs['airdrop_config']
@@ -400,6 +407,7 @@ async def register_email_handler(message: FormatedData, **kwargs):
     await send_message(message, airdrop_config.email_saved, reply_to_message_id=message.id)
     asyncio.create_task(update_db_object(user, user_db))
     kwargs['user'] = user
+    kwargs['recall'] = True
     await start(message, **kwargs)
     
 
@@ -441,6 +449,7 @@ async def twitter_link_submition_handler(message: FormatedData, **kwargs):
     asyncio.create_task(update_db_object(user, user_db))
     
     await send_message(message, airdrop_config.twitter_saved, reply_to_message_id=message.id)
+    kwargs['recall'] = True
     await start(message, **kwargs)
     
 
@@ -455,6 +464,7 @@ async def remove_wallet_handler(message: FormatedData, **kwargs):
     user.address = None
     asyncio.create_task(update_db_object(user, kwargs['user_db']))
     await send_message(message, airdrop_config.wallet_removed)
+    kwargs['recall'] = True
     await start(message, **kwargs)
     
     
@@ -469,6 +479,7 @@ async def remove_email_handler(message: FormatedData, **kwargs):
     user.balance -= airdrop_config.extral_reward
     asyncio.create_task(update_db_object(user, kwargs['user_db']))
     await send_message(message, airdrop_config.email_removed)
+    kwargs['recall'] = True
     await start(message, **kwargs)
 
     
@@ -496,6 +507,7 @@ async def retweeted_callback_handler(message: FormatedData, **kwargs):
     await send_message(message, airdrop_config.task_complete)
     asyncio.create_task(update_db_object(user, user_db))
     await send_message(message, airdrop_config.account_created)
+    kwargs['recall'] = True
     await start(message, **kwargs)
     if user.referral_code:
         asyncio.create_task(update_referral(user, airdrop_config, user_db))
